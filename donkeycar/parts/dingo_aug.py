@@ -21,28 +21,37 @@ def jitter(value, min_delta, max_delta):
     offset = np.random.uniform(low=min_delta, high=max_delta)
     return value + offset
 
-def salt_and_pepper(img_arr, prob=0.333):
+def get_handl(normed_input):
+    if normed_input:
+        high, low = 1., 0.
+    else:
+        high, low = 255, 0
+    return high, low
+
+def salt_and_pepper(img_arr, prob=0.333, normed_input=True):
     bools = np.array([True, False])
     probs = np.array([prob/2, 1-(prob/2)])
-    salt_mask  = np.random.choice(bools, size=img_arr.shape[:2], p=probs)
+    salt_mask    = np.random.choice(bools, size=img_arr.shape[:2], p=probs)
     pepper_mask  = np.random.choice(bools, size=img_arr.shape[:2], p=probs)
-    img_arr_copy = img_arr[:]
-    img_arr_copy[salt_mask]   = 255
-    img_arr_copy[pepper_mask] = 0
-    return img_arr_copy
+    #img_arr_copy = img_arr[:]
+    h, l = get_handl(normed_input)
+    img_arr[salt_mask]   = h
+    img_arr[pepper_mask] = l
+    return img_arr
 
-def hundreds_and_thousands(img_arr, prob=0.333):
+def hundreds_and_thousands(img_arr, prob=0.333, normed_input=True):
     bools = np.array([True, False])
     probs = np.array([prob, 1-prob])
     rgb_mask  = np.random.choice(bools, size=img_arr.shape, p=probs)
     num_true  = rgb_mask.sum()
-    rand_ints = np.random.randint(low=0, high=256, size=(num_true,))
-    img_arr_copy = img_arr[:]
-    img_arr_copy[rgb_mask] = rand_ints
 
-    return img_arr_copy
+    h, l = get_handl(normed_input)
+    rand = np.random.uniform(low=l, high=h, size=(num_true,))
+    img_arr[rgb_mask] = rand
 
-def overlay_random_image(I, max_alpha, image_list):
+    return img_arr
+
+def overlay_random_image(I, max_alpha, image_list, normed_input=True):
     rand_alpha      = np.random.uniform(high = max_alpha)
     rand_image_path = np.random.choice(image_list)
     h,w,_           = I.shape
@@ -54,14 +63,19 @@ def overlay_random_image(I, max_alpha, image_list):
         # Grayscale image
         rand_image = np.dstack((rand_image, rand_image, rand_image))
 
-    I          = I.astype(np.float32) / 255.
-    I         *= (1-rand_alpha)
-    I          = np.array((I+rand_image)*255, dtype=int)
+    if not normed_input:
+        I  = I.astype(np.float32) / 255.
+
+    I *= (1-rand_alpha)
+    if not normed_input:
+        I = np.array((I+rand_image)*255, dtype=int)
     return I
 
-def saturation(I, rand_min, rand_max):
-    sat = np.random.randint(rand_min, rand_max, size=I.shape)
-    return np.clip(I+sat, 0,255)
+def saturation(I, rand_min, rand_max, normed_input=True):
+    sat = np.random.uniform(rand_min, rand_max, size=I.shape)
+
+    h, l = get_handl(normed_input)
+    return np.clip(I+sat, l,h)
 
 
 def rgb2gray(rgb_img):
@@ -82,12 +96,6 @@ def shuffle_channels(I):
 def blockout(I, min_frac, max_frac):
     h,w,_    = I.shape
     if min_frac * min([h,w]) < 2:
-        #print("***** WARNING *****")
-        #print("The minimum blockout rectangle size must be > 2."
-        #    " Make min_frac and max_frac larger. Maybe check"
-        #    " the size of your images")
-        #print("image h : {}, image_w : {}".format(h,w))
-        #print("Skipping")
         return I
     frac     = np.random.uniform(min_frac, max_frac)
     block_w  = np.random.randint(1, w*frac)

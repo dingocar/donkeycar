@@ -296,7 +296,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                "cfg.AUG_SHADOW_IMAGES_PATTERN having a pattern, you have "
                "indicated you want to use the shadow image augmentation step. "
                "Cannot find any images at the pattern provided: \n"
-               "'{cfg.AUG_SHADOW_IMAGES_PATTERN}' \n"
+              f"'{cfg.AUG_SHADOW_IMAGES_PATTERN}' \n"
                "set cfg.AUG_SHADOW_IMAGES_PATTERN to None or check the "
                "pattern")
     else:
