@@ -34,6 +34,7 @@ def update_model_info(new_model_dir, key, value):
 
     with open(os.path.join(new_model_dir,"model_info.json"), 'w') as f:
         json.dump(model_info, f, indent=2)
+    return model_info
 
 
 def write_model_info(new_model_dir, dingo_archive_paths, cfg, aug):
@@ -58,13 +59,14 @@ def write_model_info(new_model_dir, dingo_archive_paths, cfg, aug):
                 "AUG_WARP_PERSPECTIVE"      : cfg.AUG_WARP_PERSPECTIVE,
                 "AUG_JITTER_STEERING"       : cfg.AUG_JITTER_STEERING,
                 "AUG_JITTER_THROTTLE"       : cfg.AUG_JITTER_THROTTLE}
-        model_info["aug"] = aug_info
+        model_info["aug_info"] = aug_info
 
     #model_info["note"] = timeout_input("Leave a note?", 30)
 
     with open(path, 'w') as f:
               json.dump(model_info, f, indent=2)
     cfg.write_to_file(os.path.join(new_model_dir, "config.py"))
+    return model_info
 
 def process_dingo_archives_gen_model_path(dingo_archive_paths,
                                           models_dir,

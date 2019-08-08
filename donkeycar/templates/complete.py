@@ -385,7 +385,7 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
             def reload_weights(filename):
                 weights_path = filename.replace('.json', '.weights')
                 load_weights(kl, weights_path)
-            
+
             model_reload_cb = reload_weights
 
         else:
@@ -642,5 +642,14 @@ if __name__ == '__main__':
             update_model_info(model_dir, "transfer", transfer)
         if notes:
             update_model_info(model_dir, "notes", notes)
+
+        if cfg.WANDB_PROJECT_NAME:
+            import wandb
+            model_info = update_model_info(model_dir, "write_to_wandb", True)
+            model_name = model_dir.split(os.sep)[-1]
+            wandb.init(project=cfg.WANDB_PROJECT_NAME,
+                       name=model_name,
+                       notes=notes,
+                       config={**args, **model_info})
 
         multi_train(cfg, dirs, model, transfer, model_type, continuous, aug)

@@ -38,6 +38,7 @@ from donkeycar.parts.keras import KerasLinear, KerasIMU,\
      KerasRNN_LSTM, KerasLatent
 from donkeycar.parts.augment import dingo_aug, load_shadow_image_without_alpha_channel
 from donkeycar.utils import *
+import wandb
 
 '''
 matplotlib can be a pain to setup on a Mac. So handle the case where it is absent. When present,
@@ -355,7 +356,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
 
     if cfg.PRINT_MODEL_SUMMARY:
         print(kl.model.summary())
-    
+
     opts['keras_pilot'] = kl
     opts['continuous'] = continuous
     opts['model_type'] = model_type
@@ -367,7 +368,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
     collate_records(records, gen_records, opts)
 
     def generator(save_best, opts, data, batch_size, isTrainSet=True, min_records_to_train=1000):
-        
+
         num_records = len(data)
         while True:
 
@@ -382,7 +383,7 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                     new_num_rec = len(data)
                     if new_num_rec > num_records:
                         print('picked up', new_num_rec - num_records, 'new records!')
-                        num_records = new_num_rec 
+                        num_records = new_num_rec
                         save_best.reset_best()
                 if num_records < min_records_to_train:
                     print("not enough records to train. need %d, have %d. waiting..." % (min_records_to_train, num_records))
@@ -404,13 +405,13 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
 
             if type(kl.model.input) is list:
                 model_in_shape = (2, 1)
-            else:    
+            else:
                 model_in_shape = kl.model.input.shape
 
             has_imu = type(kl) is KerasIMU
             has_bvh = type(kl) is KerasBehavioral
             img_out = type(kl) is KerasLatent
-            
+
             if img_out:
                 import cv2
 
@@ -446,37 +447,60 @@ def train(cfg, tub_names, model_name, transfer_model, model_type, continuous, au
                         #get image data if we don't already have it
                         if record['img_data'] is None:
                             filename = record['image_path']
-                            
+
                             img_arr = load_scaled_image_arr(filename, cfg)
 
                             if img_arr is None:
                                 break
-                            
+
                             if cfg.CACHE_IMAGES:
                                 record['img_data'] = img_arr.copy()
                         else:
                             img_arr = record['img_data'].copy()
-                            
-                        if img_out:                            
+
+                        if img_out:
                             rz_img_arr = cv2.resize(img_arr, (127, 127)) / 255.0
                             out_img.append(rz_img_arr[:,:,0].reshape((127, 127, 1)))
-                            
+
                         if has_imu:
                             inputs_imu.append(record['imu_array'])
-                        
+
                         if has_bvh:
                             inputs_bvh.append(record['behavior_arr'])
 
                         # only apply aug to training set.
                         angle    = record['angle']
                         throttle = record['throttle']
+
+                        '''
+                        name     = os.path.splitext(record['image_path'])[0]
+                        print(name)
+                        new_path = f"{name}_BEFORE_{i}.jpg"
+                        Image.fromarray((img_arr * 255.).astype(np.uint8)).save(new_path)
+                        new_path = f"{name}_BEFORE_{i}.json"
+                        with open(new_path, 'w') as f:
+                            json.dump({k:v for k,v in record.items() if k != "img_data"}, f, indent=2)
+                        '''
+
                         if aug and isTrainSet:
+
                             img_arr, angle, throttle = dingo_aug(cfg,
                                                        img_arr,
                                                        angle,
                                                        throttle,
                                                        shadow_images = shadow_images)
                                                        #do_warp_persp = cfg.AUG_WARP_PERSPECTIVE)
+
+                            '''
+                            new_path = f"{name}_AFTER_{i}.jpg"
+                            Image.fromarray((img_arr * 255.).astype(np.uint8)).save(new_path)
+                            new_path = f"{name}_AFTER_{i}.json"
+                            with open(new_path, 'w') as f:
+                                __x = {k:v for k,v in record.items() if k != "img_data"}
+                                __x["after_angel"] = angle
+                                __x["after_throttle"] = throttle
+                                json.dump(__x, f, indent=2)
+                            '''
 
                         inputs_img.append(img_arr)
                         angles.append(angle)
@@ -590,6 +614,17 @@ def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epo
     if cfg.USE_EARLY_STOP and not continuous:
         callbacks_list.append(early_stop)
 
+    if cfg.WANDB_PROJECT_NAME:
+        class MyWandBCallback(keras.callbacks.Callback):
+            def on_epoch_end(self, epoch, logs={}):
+                wandb.log({"loss"     : logs["loss"],
+                           "val_loss" : logs["val_loss"]})
+                img, _ = next(train_gen)
+                img = img[0][0]
+                wandb.log({"examples": [wandb.Image(img, caption="poop")]})
+        callbacks_list.append(MyWandBCallback())
+
+
     history = kl.model.fit_generator(
                     train_gen, 
                     steps_per_epoch=steps_per_epoch, 
@@ -625,7 +660,7 @@ def go_train(kl, cfg, train_gen, val_gen, gen_records, model_name, steps_per_epo
                 plt.ylabel('loss')
                 plt.xlabel('epoch')
                 plt.legend(['train', 'validate'], loc='upper right')
-                
+
                 # summarize history for acc
                 if 'angle_out_acc' in history.history:
                     plt.subplot(122)
