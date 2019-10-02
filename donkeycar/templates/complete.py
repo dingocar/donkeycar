@@ -4,7 +4,10 @@ Scripts to drive a donkey 2 car
 
 Usage:
     manage.py (drive) [--model=<model>] [--js] [--type=(linear|categorical|rnn|imu|behavior|3d|localizer|latent)] [--camera=(single|stereo)] [--meta=<key:value> ...]
-    manage.py (train) [--tub=<tub1,tub2,..tubn>] [--file=<file> ...] (--model=<model>) [--transfer=<model>] [--type=(linear|categorical|rnn|imu|behavior|3d|localizer)] [--continuous] [--aug]
+    manage.py (train) [--tub=<tub1,tub2,..tubn>] [--file=<file> ...]
+    (--model=<model>) [--transfer=<model>]
+    [--type=(linear|categorical|rnn|imu|behavior|3d|localizer)] [--continuous]
+    [--aug] [--notes=<notes>]
 
 
 Options:
@@ -29,7 +32,31 @@ from donkeycar.parts.throttle_filter import ThrottleFilter
 from donkeycar.parts.behavior import BehaviorPart
 from donkeycar.parts.file_watcher import FileWatcher
 from donkeycar.parts.launch import AiLaunch
-from donkeycar.utils import *
+from scripts.input_with_timeout import timeout_input
+
+def prepare_dingo_car_style_archive(tub_path, info_json, data_path, remote_dst=None, port=2050):
+        from scripts.organize_tub import archive_tub, delete_tub, rsync
+        choice = timeout_input(("What would you like to do with this data?\n"
+                               "(z)ip and ship, (d)elet, (l)eave me alone!"),
+                               10, default='l')
+        while choice.lower() not in ['d', 'z', 'l']:
+            choice = intput("Please enter 'y' or 'n': ")
+
+        if choice.lower() == 'z':
+
+            #tub_path = os.path.join(cfg.CAR_PATH, "tub")
+            message  = timeout_input("Leave a comment.", 10, default="")
+            outdir   = archive_tub(tub_path,
+                                   info_json,
+                                   data_path,
+                                   message=message,
+                                   delete_tub_when_done=True)
+            rsync(outdir, remote_dst, port=port)
+            print(f"Nice tub archive has been saved at: '{outdir}'")
+
+        elif choice.lower() == 'd':
+            delete_tub(tub_path)
+            print(f"Tub '{tub_path}' has been deleted")
 
 def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type='single', meta=[] ):
     '''
@@ -40,7 +67,7 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
     cfg.DRIVE_LOOP_HZ assuming each part finishes processing in a timely manner.
     Parts may have named outputs and inputs. The framework handles passing named outputs
     to parts requesting the same named input.
-    '''
+    m'''
 
     if cfg.DONKEY_GYM:
         #the simulator will use cuda and then we usually run out of resources
@@ -544,47 +571,77 @@ def drive(cfg, model_path=None, use_joystick=False, model_type=None, camera_type
         print("You can now move your joystick to drive your car.")
         #tell the controller about the tub        
         ctr.set_tub(tub)
-        
+
         if cfg.BUTTON_PRESS_NEW_TUB:
-    
+
             def new_tub_dir():
                 V.parts.pop()
                 tub = th.new_tub_writer(inputs=inputs, types=types, user_meta=meta)
                 V.add(tub, inputs=inputs, outputs=["tub/num_records"], run_condition='recording')
                 ctr.set_tub(tub)
-    
+
             ctr.set_button_down_trigger('cross', new_tub_dir)
         ctr.print_controls()
 
     #run the vehicle for 20 seconds
-    V.start(rate_hz=cfg.DRIVE_LOOP_HZ, 
+    V.start(rate_hz=cfg.DRIVE_LOOP_HZ,
             max_loop_count=cfg.MAX_LOOPS)
 
+    if tub.current_ix >= 0:
+        tub_path = th.tub_path
+        prepare_dingo_car_style_archive(tub_path,
+                                        cfg.INFO_PATH,
+                                        cfg.DATA_PATH,
+                                        cfg.RSYNC_DATA_DST,
+                                        cfg.REMOTE_PORT)
+
+def all_dingo_tub_archives(tub_paths):
+    # The 'info.json' is a tell tail sign that you're looking at a dingo tub archive
+    number_of_dingo_archives = sum([os.path.exists(os.path.join(t, "info.json")) for t in tub_paths])
+    are_all_dingo_archives = False
+    if number_of_dingo_archives > 0:
+        assert number_of_dingo_archives == len(tub_paths),\
+                               ("All paths must lead to dingo tub archives or "
+                                "traditional donkey tubs. YOU CAN'T MIX AND MATCH")
+        are_all_dingo_archives = True
+    return are_all_dingo_archives
 
 if __name__ == '__main__':
     args = docopt(__doc__)
     cfg = dk.load_config()
-    
+
     if args['drive']:
         model_type = args['--type']
         camera_type = args['--camera']
         drive(cfg, model_path=args['--model'], use_joystick=args['--js'], model_type=model_type, camera_type=camera_type,
             meta=args['--meta'])
-    
+
     if args['train']:
         from train import multi_train, preprocessFileList
-        
-        tub = args['--tub']
-        model = args['--model']
-        transfer = args['--transfer']
+        from scripts.make_model_name import process_dingo_archives_gen_model_path, update_model_info
+
+        tub        = args['--tub']
+        model      = args['--model']
+        transfer   = args['--transfer']
         model_type = args['--type']
         continuous = args['--continuous']
-        aug = args['--aug']     
+        aug        = args['--aug']
+        notes      = args['--notes']
 
         dirs = preprocessFileList( args['--file'] )
         if tub is not None:
             tub_paths = [os.path.expanduser(n) for n in tub.split(',')]
             dirs.extend( tub_paths )
 
-        multi_train(cfg, dirs, model, transfer, model_type, continuous, aug)
+        model_dir, dirs = process_dingo_archives_gen_model_path(dirs,
+                cfg.MODELS_PATH, cfg, aug)
+        model = os.path.join(model_dir, "model.h5")
 
+        # Save some info about the training run
+        update_model_info(model_dir, "args", args)
+        if transfer:
+            update_model_info(model_dir, "transfer", transfer)
+        if notes:
+            update_model_info(model_dir, "notes", notes)
+
+        multi_train(cfg, dirs, model, transfer, model_type, continuous, aug)

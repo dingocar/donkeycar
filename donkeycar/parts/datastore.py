@@ -17,6 +17,7 @@ import pandas as pd
 
 from PIL import Image
 
+random.seed(42)
 
 class Tub(object):
     """
@@ -372,8 +373,8 @@ class Tub(object):
 
                 if record_transform:
                     record_dict = record_transform(record_dict)
-
-                record_dict = self.read_record(record_dict)
+                else:
+                    record_dict = self.read_record(record_dict)
 
                 yield record_dict
 
@@ -412,7 +413,7 @@ class Tub(object):
             yield X, Y
 
 
-    def get_train_val_gen(self, X_keys, Y_keys, batch_size=128, record_transform=None, train_frac=.8):
+    def get_train_val_gen(self, X_keys, Y_keys, batch_size=128, record_transform=None, valid_transform=None, train_frac=.8):
         train_df = train=self.df.sample(frac=train_frac,random_state=200)
         val_df = self.df.drop(train_df.index)
 
@@ -420,7 +421,7 @@ class Tub(object):
                                        record_transform=record_transform, df=train_df)
 
         val_gen = self.get_train_gen(X_keys=X_keys, Y_keys=Y_keys, batch_size=batch_size,
-                                       record_transform=record_transform, df=val_df)
+                                       record_transform=valid_transform, df=val_df)
 
         return train_gen, val_gen
 
@@ -466,6 +467,7 @@ class TubReader(Tub):
 class TubHandler():
     def __init__(self, path):
         self.path = os.path.expanduser(path)
+        self.tub_path = self.create_tub_path()
 
     def get_tub_list(self,path):
         folders = next(os.walk(path))[1]
@@ -493,8 +495,7 @@ class TubHandler():
         return tub_path
 
     def new_tub_writer(self, inputs, types, user_meta=[]):
-        tub_path = self.create_tub_path()
-        tw = TubWriter(path=tub_path, inputs=inputs, types=types, user_meta=user_meta)
+        tw = TubWriter(path=self.tub_path, inputs=inputs, types=types, user_meta=user_meta)
         return tw
 
 
