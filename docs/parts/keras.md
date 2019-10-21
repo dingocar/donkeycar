@@ -2,7 +2,6 @@
 
 These parts encapsulate models defined using the [Keras](https://keras.io/) high level api. They are intended to be used with the Tensorflow backend. The parts are designed to use the trained artificial neural network to reproduce the steering and throttle given the image the camera sees. They are created by using the [train command](/guide/train_autopilot/).
 
-
 ## Keras Categorical
 
 This model type is created with the --type=catagorical. 
@@ -172,7 +171,7 @@ Network: 4 3D Convolution layers each followed by max pooling, followed by 2 den
 Output: One dense layer with two scalar outputs for steering and throttle.
 
 
-## Keras Bahavior
+## Keras Behavior
 
 This model type is created with the --type=behavior. 
 
