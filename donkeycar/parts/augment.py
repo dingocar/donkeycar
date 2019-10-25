@@ -185,25 +185,3 @@ def dingo_aug(cfg, np_img, steering_angle, throttle, shadow_images=None):
         pass
 
     return np_img, steering_angle, throttle
-
-def random_bool(true_prob):
-    return np.random.choice([True, False], 1, p=[true_prob, 1.-true_prob])
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
