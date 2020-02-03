@@ -1,0 +1,7 @@
+md5: 6c65ecb3c6c44a61b161bbd3366a7e87
+outs:
+- md5: 9ecbe85a3578ad80568cec27622059ad.dir
+  path: my_living_room_tall-josh_2019-07-30_11:51:40
+  cache: true
+  metric: false
+  persist: false
