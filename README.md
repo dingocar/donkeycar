@@ -58,17 +58,20 @@ These are the steps to follow from gather data (manually drive) to training to d
 1. Make sure your running an ssh server on your local machine. If not intall it.
 
 ```
+# If this returns anythin then you have openssh-server so you can 
+# skip the subsiquent steps.
+which ssh
 sudo apt-get update
 sudo apt-get install openssh-server
 ```
 
-2. Add your own public key to authorized keys
+2. Add your own public key to authorized keys. This will allow you to sent data from the Pi back to your laptop.
 
 ```
 cat ~/.ssh/id_rsa.pub >> authorized_keys
 ```
 
-### Shh to pi, with the right args.
+### Ssh to pi, with the right args.
 
 1. ssh to the pi with `-AR`. `A` will forward with you're local credentials. The
 `R 2050` will forward a port from the Pi back to your local machine. This will allow
@@ -89,7 +92,7 @@ ssh -AR 2050:localhost:22 pi@roba1.local
 
 1. Fill in the `info.json`: The `info.json` is used to help keep track of when a dataset was gathers and what type of data is in the tub that is gathered. I recomend you fill this is at the start of a labelling session (or whenever your track or track  environment changes). A sample `info.json` is below:
 
-```
+```json
 {
   "count"       : SET AUTOMATICALLY,
   "date"        : SET AUTOMATICALLY,
@@ -97,9 +100,10 @@ ssh -AR 2050:localhost:22 pi@roba1.local
   "floor"       : "timber",
   "location"    : "bill gates' house",
   "centre line" : true,
+}
+```
 
-
-# donkeycar: a python self driving library
+# Donkeycar: a python self driving library
 
 [![Build Status](https://travis-ci.org/autorope/donkeycar.svg?branch=dev)](https://travis-ci.org/autorope/donkeycar)
 [![CodeCov](https://codecov.io/gh/autoropoe/donkeycar/branch/dev/graph/badge.svg)](https://codecov.io/gh/autorope/donkeycar/branch/dev)
