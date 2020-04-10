@@ -1,5 +1,7 @@
 # Dingocar...Donkeycar, down-under
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tall-josh/dingocar/blob/dev/notebooks/dingocar_demo_colab_long_interactive.ipynb]
+
 # Install on Comuter/Laptop (Not the Pi)
 
 Donkeycar has great documentation but we have a few convienace functions that need 
